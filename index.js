@@ -36,7 +36,7 @@ for(let i=0; i<labelBoxData.length; i++) {
 
 	//for testing:
 	//if(i > 0) break;
-	//if(filename !== 'P2017.3.1740') continue;
+	//if(filename !== 'P2017.3.531') continue;
 
 	(function(item) {
 		setTimeout(function() {
@@ -100,8 +100,8 @@ function getGeometryBoundaries(geometry) {
 
 	//find the highest and lowest x and y
 	for(let i=0; i<geometry.length; i++) {
-		if(geometry[i].x < top) top = geometry[i].y;
-		if(geometry[i].y < left) left = geometry[i].x;
+		if(geometry[i].y < top) top = geometry[i].y;
+		if(geometry[i].x < left) left = geometry[i].x;
 
 		if(geometry[i].x > width) width = geometry[i].x;
 		if(geometry[i].y > height) height = geometry[i].y;
