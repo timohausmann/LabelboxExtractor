@@ -6,11 +6,11 @@ Install dependencies
 
     npm install
 
-Run script (looks for an export.json in the working directory)
+Run script (looks for an export-.\*.json in the working directory)
 
     node index.js 
     
-Run script (pass export.json filename as an argument)    
+Run script (pass export-filename.json as an argument)    
 
     node index.js export-filename.json
 
