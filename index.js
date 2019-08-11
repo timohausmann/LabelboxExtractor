@@ -10,40 +10,47 @@ if(process.argv[2]) {
 	inputFile = process.argv[2];
 } else {
 	fs.readdirSync('.').forEach(file => {
-		if(file.match(/export-.*.json/)) {
+		if(file.match(/^export-.*.json$/)) {
 			inputFile = file;
 		}
 	});
 }
+
+//make sure output folders exist
+touchDir(outputPath, `${outputPath}/full/`, `${outputPath}/thumb/`);
 
 console.log('Reading', inputFile, '...');
 
 let labelBoxData = fs.readFileSync(`./${inputFile}`);
 labelBoxData = JSON.parse(labelBoxData);
 
-if (!fs.existsSync(outputPath)){
-	fs.mkdirSync(outputPath);
-}
 
+let fetchIndex = 0;
 for(let i=0; i<labelBoxData.length; i++) {
 
 	const item = labelBoxData[i];
 	const filename = sanitizeFilename(item['External ID']);
-	if(fs.existsSync(`${outputPath}/${filename}`)) {
-		console.log(`${outputPath}/${filename}`, 'already exists – skipping.')
+	if(fs.existsSync(`${outputPath}/full/${filename}`)) {
+		console.log(`${outputPath}/${filename}`, 'already exists – skipping')
 		continue;
 	}
 
 	//for testing:
-	//if(i > 0) break;
+	//if(fetchIndex > 0) break;
 	//if(filename !== 'P2017.3.531') continue;
 
 	(function(item) {
+		console.log('scheduling ', item['External ID']);
 		setTimeout(function() {
 			goFetch(item);
-		}, i*5000);
+		}, fetchIndex*2000);
 	})(item);
+
+	fetchIndex++;
 }
+
+console.log('We are looking at ', fetchIndex, ' labeled images');
+console.log('Which takes at least ', ((fetchIndex*2)/60).toFixed(2), ' minutes');
 
 	
 function goFetch(item) {
@@ -58,43 +65,80 @@ function goFetch(item) {
 
 	request({ url, encoding: null }, (err, resp, buffer) => {
 
-		if(!fs.existsSync(`${outputPath}/${filename}`)){
-			fs.mkdirSync(`${outputPath}/${filename}`);
-		}
+		//make sure output folders exist
+		touchDir(`${outputPath}/full/${filename}`, `${outputPath}/thumb/${filename}`);
 
 		//save whole image
 		sharp(buffer)
-		.toFile(`${outputPath}/${filename}/${filename}.jpg`, (err, info) => { console.log(err || 'saved image', info) });
+		.toFile(`${outputPath}/full/${filename}/${filename}.jpg`, (err, info) => { 
+			if(err) {
+				console.log(err);
+				console.log(filename);
+			} else {
+				//console.log('saved image', info);
+			}
+		})
+		.resize(1280)
+		.toFile(`${outputPath}/thumb/${filename}/${filename}.jpg`, (err, info) => { 
+			if(err) {
+				console.log(err);
+				console.log(filename);
+			} else {
+				//console.log('saved image', info);
+			}
+		})
 
+		let counter = 0;
     	for(let label in labels) {
 
 			let labelSant = sanitizeLabel(label);
 
+			//force rectangles for everything but Frame
+			const isFrame = (label === 'Frame');
+			let forceRectangle = isFrame ? false : true;
+
+			//@todo save frames
+			if(isFrame) continue;
+
 			for(let coords of labels[label]) {
 
 				const { geometry } = coords;
-				const { top, left, width, height } = getGeometryBoundaries(geometry);	
+				const { top, left, width, height } = getGeometryBoundaries(geometry, forceRectangle);
 				
-				const thumbName = `${filename}-${labelSant}-${top}-${left}.png`;
+				let thumbName = `${filename}-${labelSant}-${top}-${left}`;
+				
+				counter++;
 
 				//save cutouts
 				sharp(buffer)
     				.extract({ left, top, width, height })
-		  			.toFile(`${outputPath}/${filename}/${thumbName}`, (err, info) => { 
+    				.toFile(`${outputPath}/full/${filename}/${thumbName}.jpg`, (err, info) => { 
 
 						if(err) {
 							console.log(err);
 							console.log(filename, label, top, left, width, height);
 						} else {
-							console.log('saved thumb', info);
+							//console.log('saved thumb', info);
+						}
+					})
+					.resize(320, 320)
+					.toFile(`${outputPath}/thumb/${filename}/${thumbName}.jpg`, (err, info) => { 
+
+						if(err) {
+							console.log(err);
+							console.log(filename, label, top, left, width, height);
+						} else {
+							//console.log('saved thumb', info);
 						}
 					});
 			}
 		}
+
+		console.log('processing ', counter, ' thumbnails for ', filename, ' ...');
 	});
 }
 
-function getGeometryBoundaries(geometry) {
+function getGeometryBoundaries(geometry, forceRectangle) {
 
 	let top = 9999, left = 9999, width = 0, height = 0;
 
@@ -109,7 +153,10 @@ function getGeometryBoundaries(geometry) {
 
 	width = width - left;
 	height = height - top;
-	width = height = rectifyGeometry(width, height);
+	
+	if(forceRectangle) {
+		width = height = rectifyGeometry(width, height);
+	}
 
 	//console.log('assuming geometry', {top, left, width, height});
 	return {top, left, width, height};
@@ -129,5 +176,13 @@ function sanitizeFilename(filename) {
 
 
 function sanitizeLabel(label) {
-	return label.replace(/[\s.,/()]/g, '');
+	return label.replace(/[\s.,/()-]/g, '');
+}
+
+function touchDir() {
+	[].forEach.call(arguments, path => {
+		if(!fs.existsSync(path)){
+			fs.mkdirSync(path);
+		}
+	})
 }
