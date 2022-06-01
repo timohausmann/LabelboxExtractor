@@ -10,6 +10,6 @@
   "license": "ISC",
   "devDependencies": {
     "request": "^2.88.0",
-    "sharp": "^0.22.1"
+    "sharp": "^0.30.5"
   }
 }
